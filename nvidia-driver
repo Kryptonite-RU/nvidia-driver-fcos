@@ -158,6 +158,15 @@ _unmount_rootfs() {
     fi
 }
 
+_write_kernel_update_hook() {
+    if [ ! -d ${KERNEL_UPDATE_HOOK%/*} ]; then
+        return
+    fi
+
+    echo "Writing kernel update hook..."
+    cat > ${KERNEL_UPDATE_HOOK} <<'EOF'
+#!/bin/bash
+
 set -eu
 trap 'echo "ERROR: Failed to update the NVIDIA driver" >&2; exit 0' ERR
 
