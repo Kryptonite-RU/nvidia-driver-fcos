@@ -205,7 +205,7 @@ init() {
     _unmount_rootfs
 
     if [ "${KERNEL_VERSION}" == "$(uname -r)" ]; then
-        _create_driver_package
+        # _create_driver_package
         _install_driver
         _load_driver
         _mount_rootfs
