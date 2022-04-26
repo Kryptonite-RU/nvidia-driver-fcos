@@ -111,7 +111,7 @@ _unload_driver() {
     fi
     if [ ${nvidia_refs} -gt ${nvidia_deps} ] || [ ${nvidia_uvm_refs} -gt 0 ] || [ ${nvidia_modeset_refs} -gt 0 ]; then
         echo "Could not unload NVIDIA driver kernel modules, driver is in use" >&2
-        return 1
+        return 2
     fi
 
     if [ ${#rmmod_args[@]} -gt 0 ]; then
@@ -199,19 +199,44 @@ init() {
     echo $$ >&3
 
     trap "echo 'Caught signal'; exit 1" HUP INT QUIT PIPE TERM
-    trap "_shutdown" EXIT
+    trap "echo 'Caught signal EXIT'; _shutdown" EXIT
 
-    _unload_driver || exit 1
-    _unmount_rootfs
+    echo "Desired KERNEL_VERSION=${KERNEL_VERSION} Actual KERNEL_VERSION=$(uname -r)"
+    unload_success="true"
+    _unload_driver || case $? in
+        1)  
+            echo "Unload driver got exit 1"
+            unload_success="false"
+            exit 1 
+            ;;
+        2)  
+            echo "Skip unload driver"
 
-    if [ "${KERNEL_VERSION}" == "$(uname -r)" ]; then
-        # _create_driver_package
-        _install_driver
-        _load_driver
-        _mount_rootfs
-    else
-        echo "Kernel version mismatch"
-        return 0
+            echo "Starting NVIDIA persistence daemon back again..."
+            nvidia-persistenced --persistence-mode
+
+            unload_success="false"
+            ;;
+        *)  
+            echo "Skip unload driver"
+
+            unload_success="false"
+            ;;
+    esac
+    #_unload_driver || exit 1
+
+    if [ "${unload_success}" = "true" ]; then
+        _unmount_rootfs
+
+        if [ "${KERNEL_VERSION}" == "$(uname -r)" ]; then
+            # _create_driver_package
+            _install_driver
+            _load_driver
+            _mount_rootfs
+        else
+            echo "Kernel version mismatch"
+            return 0
+        fi
     fi
 
     echo "Done, now waiting for signal"
